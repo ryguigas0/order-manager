@@ -1,21 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { OrdersModule } from './orders/orders.module';
+// import { PaymentModule } from './payment/payment.module';
+import { StockModule } from './stock/stock.module';
 
 @Module({
-  imports: [
-    ClientsModule.register([
-      {
-        name: 'CATS_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://rabbitmq:password@localhost:5672'],
-          queue: 'notifications',
-        },
-      },
-    ]),
-  ],
+  imports: [OrdersModule, StockModule],
   controllers: [AppController],
   providers: [AppService],
 })
