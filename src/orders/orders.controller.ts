@@ -11,6 +11,7 @@ export class OrdersController {
     @Inject('ORDER') private readonly orderServiceClient: ClientProxy,
     @Inject('ORDER_STOCK_RESERVATION')
     private readonly orderStockReservationClient: ClientProxy,
+    @Inject('ORDER_PAYMENT') private readonly orderPaymentClient: ClientProxy,
   ) {}
 
   @EventPattern('orders.create')
@@ -18,11 +19,11 @@ export class OrdersController {
     this.ordersService.createOrder(payload);
   }
 
-  // @EventPattern('payment.result')
-  // handlePaymentResult(@Payload() paymentResult: any) {
-  //   // Logic to handle payment result
-  //   console.log('Payment Result:', paymentResult);
-  // }
+  @EventPattern('payment.result')
+  handlePaymentResult(@Payload() paymentResult: any) {
+    // Logic to handle payment result
+    console.log('Payment: ', paymentResult);
+  }
 
   @EventPattern('stock.reservation.result')
   handleStockReservationResult(

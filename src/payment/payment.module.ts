@@ -1,23 +1,22 @@
 import { Module } from '@nestjs/common';
-import { StockService } from './stock.service';
-import { StockController } from './stock.controller';
+import { PaymentService } from './payment.service';
+import { PaymentController } from './payment.controller';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
 @Module({
   imports: [
     ClientsModule.register([
       {
-        name: 'STOCK',
+        name: 'PAYMENT',
         transport: Transport.RMQ,
         options: {
           urls: ['amqp://guest:guest@localhost:5672'],
-          queue: 'stock.reservation.*',
-          exchangeType: 'topic',
+          queue: 'payment.*',
         },
       },
     ]),
   ],
-  controllers: [StockController],
-  providers: [StockService],
+  controllers: [PaymentController],
+  providers: [PaymentService],
 })
-export class StockModule {}
+export class PaymentModule {}

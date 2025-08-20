@@ -14,16 +14,14 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
           queue: 'orders',
         },
       },
-      // {
-      //   name: 'ORDER_PAYMENT',
-      //   transport: Transport.RMQ,
-      //   options: {
-      //     urls: ['amqp://guest:guest@localhost:5672'],
-      //     queue: 'payment.*',
-      //     exchange: 'orders_exchange',
-      //     exchangeType: 'topic',
-      //   },
-      // },
+      {
+        name: 'ORDER_PAYMENT',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://guest:guest@localhost:5672'],
+          queue: 'payment',
+        },
+      },
       {
         name: 'ORDER_STOCK_RESERVATION',
         transport: Transport.RMQ,
