@@ -7,11 +7,13 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
   imports: [
     ClientsModule.register([
       {
-        name: 'STOCK_SERVICE',
+        name: 'STOCK',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://rabbitmq:password@localhost:5672'],
-          queue: 'stock',
+          urls: ['amqp://guest:guest@localhost:5672'],
+          queue: 'stock.reservation.*',
+          exchange: 'orders_exchange',
+          exchangeType: 'topic',
         },
       },
     ]),

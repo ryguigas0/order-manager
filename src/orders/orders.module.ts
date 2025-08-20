@@ -7,26 +7,28 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
   imports: [
     ClientsModule.register([
       {
-        name: 'ORDER_SERVICE',
+        name: 'ORDER',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://rabbitmq:password@localhost:5672'],
+          urls: ['amqp://guest:guest@localhost:5672'],
           queue: 'orders',
         },
       },
+      // {
+      //   name: 'ORDER_PAYMENT',
+      //   transport: Transport.RMQ,
+      //   options: {
+      //     urls: ['amqp://guest:guest@localhost:5672'],
+      //     queue: 'payment.*',
+      //     exchange: 'orders_exchange',
+      //     exchangeType: 'topic',
+      //   },
+      // },
       {
-        name: 'PAYMENT_MANAGER',
+        name: 'ORDER_STOCK_RESERVATION',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://rabbitmq:password@localhost:5672'],
-          queue: 'payment',
-        },
-      },
-      {
-        name: 'STOCK_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://rabbitmq:password@localhost:5672'],
+          urls: ['amqp://guest:guest@localhost:5672'],
           queue: 'stock',
         },
       },

@@ -6,7 +6,7 @@ import { ClientProxy } from '@nestjs/microservices';
 @Injectable()
 export class StockService {
   constructor(
-    @Inject('STOCK_SERVICE') private readonly stockQueueClient: ClientProxy,
+    @Inject('STOCK') private readonly stockQueueClient: ClientProxy,
   ) {}
 
   async create(createStockDto: CreateStockReservationDto): Promise<void> {

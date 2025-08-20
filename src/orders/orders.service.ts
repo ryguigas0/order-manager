@@ -9,7 +9,8 @@ export class OrdersService {
   constructor(
     // @Inject('PAYMENT_MANAGER')
     // private readonly paymentManagerClient: ClientProxy,
-    @Inject('STOCK_SERVICE') private readonly stockManagerClient: ClientProxy,
+    @Inject('ORDER_STOCK_RESERVATION')
+    private readonly stockManagerClient: ClientProxy,
   ) {}
 
   createOrder(newOrder: CreateOrderDto) {
@@ -21,8 +22,6 @@ export class OrdersService {
     //   shippingAddress: newOrder.shippingAddress,
     //   billingAddress: newOrder.billingAddress,
     // } as CreatePaymentDto);
-
-    console.log({ newOrder });
 
     const stockReservationPayload: CreateStockReservationDto = {
       orderId: orderId,

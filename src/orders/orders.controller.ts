@@ -1,27 +1,21 @@
-import { Body, Controller, Inject, Post } from '@nestjs/common';
+import { Controller, Inject } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ClientProxy, EventPattern, Payload } from '@nestjs/microservices';
 import { CreateStockReservationResponseDto } from 'src/stock/dto/create-stock-reservation-response.dto';
-import { PayloadData } from 'types/payload-data';
 
 @Controller()
 export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
-    @Inject('ORDER_SERVICE') private readonly orderServiceClient: ClientProxy,
+    @Inject('ORDER') private readonly orderServiceClient: ClientProxy,
+    @Inject('ORDER_STOCK_RESERVATION')
+    private readonly orderStockReservationClient: ClientProxy,
   ) {}
 
-  @Post('orders')
-  callCreateOrder(@Body() payload: CreateOrderDto) {
-    this.orderServiceClient.emit('orders.create', payload);
-    return { message: 'Order creation request sent' };
-  }
-
   @EventPattern('orders.create')
-  createOrder(@Payload() payload: PayloadData<CreateOrderDto>) {
-    // Logic to handle order creation
-    this.ordersService.createOrder(payload.data);
+  handleCreateOrder(@Payload() payload: CreateOrderDto) {
+    this.ordersService.createOrder(payload);
   }
 
   // @EventPattern('payment.result')
@@ -32,9 +26,9 @@ export class OrdersController {
 
   @EventPattern('stock.reservation.result')
   handleStockReservationResult(
-    @Payload() payload: PayloadData<CreateStockReservationResponseDto>,
+    @Payload() payload: CreateStockReservationResponseDto,
   ) {
     // Logic to handle stock reservation
-    console.log('Stock Reservation:', payload.data);
+    console.log('Stock Reservation:', payload);
   }
 }
