@@ -2,9 +2,16 @@ import { Module } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { MongooseModule } from '@nestjs/mongoose';
+import { Order, OrderSchema } from './schemas/order.schema';
 
 @Module({
   imports: [
+    MongooseModule.forRoot(
+      'mongodb://root:root@localhost:27017/order_manager',
+      { authSource: 'admin' },
+    ),
+    MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
     ClientsModule.register([
       {
         name: 'ORDER',

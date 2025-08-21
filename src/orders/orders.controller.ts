@@ -3,6 +3,8 @@ import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ClientProxy, EventPattern, Payload } from '@nestjs/microservices';
 import { CreateStockReservationResponseDto } from 'src/stock/dto/create-stock-reservation-response.dto';
+import { EventData } from 'src/util/EventData';
+import { CreatePaymentResponseDto } from 'src/payment/dto/create-payment-response.dto';
 
 @Controller()
 export class OrdersController {
@@ -15,19 +17,21 @@ export class OrdersController {
   ) {}
 
   @EventPattern('orders.create')
-  handleCreateOrder(@Payload() payload: CreateOrderDto) {
-    this.ordersService.createOrder(payload);
+  async handleCreateOrder(@Payload() payload: EventData<CreateOrderDto>) {
+    await this.ordersService.createOrder(payload);
   }
 
   @EventPattern('payment.result')
-  handlePaymentResult(@Payload() paymentResult: any) {
+  handlePaymentResult(
+    @Payload() paymentResult: EventData<CreatePaymentResponseDto>,
+  ) {
     // Logic to handle payment result
     console.log('Payment: ', paymentResult);
   }
 
   @EventPattern('stock.reservation.result')
   handleStockReservationResult(
-    @Payload() payload: CreateStockReservationResponseDto,
+    @Payload() payload: EventData<CreateStockReservationResponseDto>,
   ) {
     // Logic to handle stock reservation
     console.log('Stock Reservation:', payload);

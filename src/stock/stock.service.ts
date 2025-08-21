@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CreateStockReservationDto } from './dto/create-stock-reservation.dto';
 import { CreateStockReservationResponseDto } from './dto/create-stock-reservation-response.dto';
 import { ClientProxy } from '@nestjs/microservices';
+import { EventData } from 'src/util/EventData';
 
 @Injectable()
 export class StockService {
@@ -14,17 +15,23 @@ export class StockService {
 
     if (apiResponse.success) {
       console.log(`Stock reservation successful: ${apiResponse.reservationId}`);
-      this.stockQueueClient.emit('stock.reservation.result', {
-        success: true,
-        reservationId: apiResponse.reservationId,
-        message: apiResponse.message,
-      } as CreateStockReservationResponseDto);
+      this.stockQueueClient.emit(
+        'stock.reservation.result',
+        new EventData<CreateStockReservationResponseDto>({
+          success: true,
+          reservationId: apiResponse.reservationId,
+          message: apiResponse.message,
+        }),
+      );
     } else {
       console.error(`Stock reservation failed: ${apiResponse.message}`);
-      this.stockQueueClient.emit('stock.reservation.result', {
-        success: false,
-        message: apiResponse.message,
-      } as CreateStockReservationResponseDto);
+      this.stockQueueClient.emit(
+        'stock.reservation.result',
+        new EventData<CreateStockReservationResponseDto>({
+          success: false,
+          message: apiResponse.message,
+        }),
+      );
     }
   }
 

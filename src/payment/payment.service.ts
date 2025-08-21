@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePaymentResponseDto } from './dto/create-payment-response.dto';
 import { ClientProxy } from '@nestjs/microservices';
+import { EventData } from 'src/util/EventData';
 
 @Injectable()
 export class PaymentService {
@@ -14,17 +15,23 @@ export class PaymentService {
 
     if (apiResponse.success) {
       console.log(`Payment creation: ${apiResponse.paymentId}`);
-      this.paymentQueueClient.emit('payment.result', {
-        success: true,
-        paymentId: apiResponse.paymentId,
-        message: apiResponse.message,
-      } as CreatePaymentResponseDto);
+      this.paymentQueueClient.emit(
+        'payment.result',
+        new EventData<CreatePaymentResponseDto>({
+          success: true,
+          paymentId: apiResponse.paymentId,
+          message: apiResponse.message,
+        }),
+      );
     } else {
       console.error(`Stock reservation failed: ${apiResponse.message}`);
-      this.paymentQueueClient.emit('payment.result', {
-        success: false,
-        message: apiResponse.message,
-      } as CreatePaymentResponseDto);
+      this.paymentQueueClient.emit(
+        'payment.result',
+        new EventData<CreatePaymentResponseDto>({
+          success: false,
+          message: apiResponse.message,
+        }),
+      );
     }
   }
 

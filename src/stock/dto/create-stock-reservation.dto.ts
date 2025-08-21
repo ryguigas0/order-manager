@@ -1,5 +1,5 @@
 export class CreateStockReservationDto {
-  orderId: number;
+  orderId: string;
   productId: number;
   quantity: number;
 }

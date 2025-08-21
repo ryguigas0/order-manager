@@ -1,5 +1,5 @@
 export class CreatePaymentDto {
-  orderId: number;
+  orderId: string;
   amount: number;
   paymentMethod: string;
   shippingAddress: string;
