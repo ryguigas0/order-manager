@@ -6,14 +6,14 @@ import { Payment } from './embeds/payment.schema';
 
 export type OrderDocument = HydratedDocument<Order>;
 
-export enum Status {
-  'pending',
-  'pending-payment',
-  'pending-stock',
-  'ready',
-  'shipped',
-  'delivered',
-  'canceled',
+export enum OrderStatus {
+  pending = 'pending',
+  pendingPayment = 'pending-payment',
+  pendingStock = 'pending-stock',
+  ready = 'ready',
+  shipped = 'shipped',
+  delivered = 'delivered',
+  canceled = 'canceled',
 }
 
 export class StatusHistory {
@@ -35,7 +35,7 @@ export class StatusHistory {
       'canceled',
     ],
   })
-  status: Status;
+  status: OrderStatus;
 
   @Prop()
   reason?: string;
@@ -78,7 +78,7 @@ export class Order {
       'canceled',
     ],
   })
-  status: number;
+  status: string;
 
   @Prop()
   statusHistory: StatusHistory[];

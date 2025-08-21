@@ -5,6 +5,7 @@ import { ClientProxy, EventPattern, Payload } from '@nestjs/microservices';
 import { CreateStockReservationResponseDto } from 'src/stock/dto/create-stock-reservation-response.dto';
 import { EventData } from 'src/util/EventData';
 import { CreatePaymentResponseDto } from 'src/payment/dto/create-payment-response.dto';
+import { OrderStatus } from './schemas/order.schema';
 
 @Controller()
 export class OrdersController {
@@ -27,7 +28,8 @@ export class OrdersController {
   ) {
     if (!payload.data.success) {
       console.log('Canceling order', payload.data.orderId);
-      await this.ordersService.cancelOrder({
+      await this.ordersService.updateOrderStatus({
+        status: OrderStatus.canceled,
         eventId: payload.eventId,
         orderId: payload.data.orderId,
         reason: payload.data.message,
@@ -42,16 +44,22 @@ export class OrdersController {
   async handleStockReservationResult(
     @Payload() payload: EventData<CreateStockReservationResponseDto>,
   ) {
+    const { orderId, message } = payload.data;
+
     if (!payload.data.success) {
-      console.log('Canceling order', payload.data.orderId);
-      await this.ordersService.cancelOrder({
+      console.log('Canceling order', orderId);
+      await this.ordersService.updateOrderStatus({
+        status: OrderStatus.canceled,
         eventId: payload.eventId,
-        orderId: payload.data.orderId,
-        reason: payload.data.message,
+        orderId: orderId,
+        reason: message,
       });
       return;
     }
+
+    await this.ordersService.emitNextStep(orderId);
+
     // Logic to handle stock reservation
-    console.log('Stock Reservation:', payload);
+    // console.log('Stock Reservation:', payload);
   }
 }

@@ -3,19 +3,19 @@ import { ClientProxy } from '@nestjs/microservices';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreatePaymentDto } from 'src/payment/dto/create-payment.dto';
 import { CreateStockReservationDto } from 'src/stock/dto/create-stock-reservation.dto';
-import { Order } from './schemas/order.schema';
+import { Order, OrderStatus } from './schemas/order.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { EventData } from 'src/util/EventData';
-import { CancelOrderDto } from './dto/cancel-order.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @Inject('ORDER_PAYMENT')
-    private readonly paymentManagerClient: ClientProxy,
+    private readonly paymentQueue: ClientProxy,
     @Inject('ORDER_STOCK_RESERVATION')
-    private readonly stockManagerClient: ClientProxy,
+    private readonly stockQueue: ClientProxy,
     @InjectModel(Order.name) private orderModel: Model<Order>,
   ) {}
 
@@ -46,7 +46,7 @@ export class OrdersService {
 
     const order = await createdOrder.save();
 
-    console.log({ order });
+    // console.log({ order });
 
     const paymentPayload: CreatePaymentDto = {
       orderId: order._id.toString(),
@@ -56,7 +56,7 @@ export class OrdersService {
       billingAddress: order.customer.address.billing,
     };
 
-    await this.paymentManagerClient
+    await this.paymentQueue
       .emit('payment.create', new EventData<CreatePaymentDto>(paymentPayload))
       .toPromise();
 
@@ -65,7 +65,7 @@ export class OrdersService {
       items: order.items,
     };
 
-    await this.stockManagerClient
+    await this.stockQueue
       .emit(
         'stock.reservation.create',
         new EventData<CreateStockReservationDto>(stockReservationPayload),
@@ -73,9 +73,15 @@ export class OrdersService {
       .toPromise();
   }
 
-  async cancelOrder(cancelOrderDto: CancelOrderDto): Promise<void> {
+  async getOrder(orderId: string) {
+    return this.orderModel.findById(orderId);
+  }
+
+  async updateOrderStatus(
+    updateStatusDto: UpdateOrderStatusDto,
+  ): Promise<void> {
     const shouldProcess = await this.validateIdempotency(
-      cancelOrderDto.eventId,
+      updateStatusDto.eventId,
     );
     if (!shouldProcess) {
       return;
@@ -84,23 +90,71 @@ export class OrdersService {
     await this.orderModel
       .updateOne(
         {
-          _id: cancelOrderDto.orderId,
+          _id: updateStatusDto.orderId,
         },
         {
           $set: {
-            status: 'canceled',
+            status: updateStatusDto.status,
           },
           $push: {
             statusHistory: {
-              eventId: cancelOrderDto.eventId,
-              status: 'canceled',
+              eventId: updateStatusDto.eventId,
+              status: updateStatusDto.status,
               timestamp: new Date().toISOString(),
-              reason: cancelOrderDto.reason,
+              reason: updateStatusDto.reason,
             },
           },
         },
       )
       .exec();
+  }
+
+  async emitNextStep(orderId: string) {
+    const order = await this.getOrder(orderId);
+
+    console.log({ order });
+
+    // switch (order?.status as Status) {
+    //   case Status.pending:
+    //     this.stockQueue.emit(
+    //       'stock.reservation.confirm',
+    //       new EventData<ConfirmStockReservationDto>(),
+    //     );
+    //     this.paymentQueue.emit(
+    //       'payment.confirm',
+    //       new EventData<ConfirmPaymentDto>(),
+    //     );
+    //     break;
+    //   case Status.pendingPayment:
+    //     this.paymentQueue.emit(
+    //       'payment.confirm',
+    //       new EventData<ConfirmPaymentDto>(),
+    //     );
+    //     break;
+    //   case Status.pendingStock:
+    //     this.stockQueue.emit(
+    //       'stock.reservation.confirm',
+    //       new EventData<ConfirmStockReservationDto>(),
+    //     );
+    //     break;
+    //   case Status.ready:
+    //     this.paymentQueue.emit(
+    //       'order.ship',
+    //       new EventData<ConfirmPaymentDto>(),
+    //     );
+    //     break;
+    //   case Status.shipped:
+    //     this.paymentQueue.emit(
+    //       'order.deliver',
+    //       new EventData<ConfirmPaymentDto>(),
+    //     );
+    //     break;
+    //   // no next steps for delivered or canceled orders
+    //   case Status.delivered:
+    //   case Status.canceled:
+    //   default:
+    //     return;
+    // }
   }
 
   private async validateIdempotency(eventId: string): Promise<boolean> {
