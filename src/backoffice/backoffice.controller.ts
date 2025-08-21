@@ -17,7 +17,7 @@ export class BackofficeController {
     await this.orderServiceClient
       .emit('orders.create', new EventData<CreateOrderDto>(payload))
       .toPromise();
-    console.debug('Order creation request sent:', payload);
+    // console.debug('Order creation request sent:', payload);
     return { message: 'Order creation request sent' };
   }
 
@@ -29,7 +29,7 @@ export class BackofficeController {
         new EventData<CreateStockReservationDto>(payload),
       )
       .toPromise();
-    console.debug('Stock reservation request sent:', payload);
+    // console.debug('Stock reservation request sent:', payload);
     return { message: 'Stock reservation request sent' };
   }
 }

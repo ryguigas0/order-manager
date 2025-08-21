@@ -19,15 +19,17 @@ export class PaymentService {
         'payment.result',
         new EventData<CreatePaymentResponseDto>({
           success: true,
+          orderId: createPaymentDto.orderId,
           paymentId: apiResponse.paymentId,
           message: apiResponse.message,
         }),
       );
     } else {
-      console.error(`Stock reservation failed: ${apiResponse.message}`);
+      console.error(`Payment creation failed: ${apiResponse.message}`);
       this.paymentQueueClient.emit(
         'payment.result',
         new EventData<CreatePaymentResponseDto>({
+          orderId: createPaymentDto.orderId,
           success: false,
           message: apiResponse.message,
         }),
@@ -46,15 +48,17 @@ export class PaymentService {
 
     // Simulate 60% chance of success
     if (Math.random() < 0.6) {
-      console.log('Stock reserved successfully');
+      // console.log('Payment created successfully');
       return {
+        orderId: createPaymentDto.orderId,
         success: true,
         paymentId: Math.floor(Math.random() * 100000),
         message: 'Payment created successfully',
       };
     } else {
-      console.log('Error reserving stock');
+      // console.log('Error creating payment');
       return {
+        orderId: createPaymentDto.orderId,
         success: false,
         message: 'Failed to create payment due to API error',
       };

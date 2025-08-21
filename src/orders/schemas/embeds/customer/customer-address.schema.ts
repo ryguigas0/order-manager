@@ -1,6 +1,5 @@
-import { Schema, Prop } from '@nestjs/mongoose';
+import { Prop } from '@nestjs/mongoose';
 
-@Schema()
 export class CustomerAddress {
   @Prop()
   billing: string;

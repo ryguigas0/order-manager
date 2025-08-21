@@ -1,6 +1,5 @@
-import { Schema, Prop } from '@nestjs/mongoose';
+import { Prop } from '@nestjs/mongoose';
 
-@Schema()
 export class Item {
   @Prop()
   itemId: number;

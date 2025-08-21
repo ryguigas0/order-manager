@@ -16,7 +16,6 @@ export enum Status {
   'canceled',
 }
 
-@Schema()
 export class StatusHistory {
   @Prop()
   eventId: string;
@@ -24,8 +23,22 @@ export class StatusHistory {
   @Prop()
   timestamp: string; // datetime string
 
-  @Prop({ enum: Status })
+  @Prop({
+    type: String,
+    enum: [
+      'pending',
+      'pending-payment',
+      'pending-stock',
+      'ready',
+      'shipped',
+      'delivered',
+      'canceled',
+    ],
+  })
   status: Status;
+
+  @Prop()
+  reason?: string;
 }
 
 @Schema({
@@ -53,7 +66,18 @@ export class Order {
   @Prop()
   payment: Payment;
 
-  @Prop()
+  @Prop({
+    type: String,
+    enum: [
+      'pending',
+      'pending-payment',
+      'pending-stock',
+      'ready',
+      'shipped',
+      'delivered',
+      'canceled',
+    ],
+  })
   status: number;
 
   @Prop()

@@ -1,11 +1,10 @@
-import { Prop, Schema } from '@nestjs/mongoose';
+import { Prop } from '@nestjs/mongoose';
 
 export enum PaymenthMethod {
   'pix',
   'debit',
 }
 
-@Schema()
 export class Payment {
   @Prop()
   totalAmount: number;

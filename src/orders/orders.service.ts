@@ -7,6 +7,7 @@ import { Order } from './schemas/order.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { EventData } from 'src/util/EventData';
+import { CancelOrderDto } from './dto/cancel-order.dto';
 
 @Injectable()
 export class OrdersService {
@@ -59,22 +60,47 @@ export class OrdersService {
       .emit('payment.create', new EventData<CreatePaymentDto>(paymentPayload))
       .toPromise();
 
-    for (let i = 0; i < order.items.length; i++) {
-      const item = order.items[i];
+    const stockReservationPayload: CreateStockReservationDto = {
+      orderId: order._id.toString(),
+      items: order.items,
+    };
 
-      const stockReservationPayload: CreateStockReservationDto = {
-        orderId: order._id.toString(),
-        productId: item.itemId,
-        quantity: item.quantity,
-      };
+    await this.stockManagerClient
+      .emit(
+        'stock.reservation.create',
+        new EventData<CreateStockReservationDto>(stockReservationPayload),
+      )
+      .toPromise();
+  }
 
-      await this.stockManagerClient
-        .emit(
-          'stock.reservation.create',
-          new EventData<CreateStockReservationDto>(stockReservationPayload),
-        )
-        .toPromise();
+  async cancelOrder(cancelOrderDto: CancelOrderDto): Promise<void> {
+    const shouldProcess = await this.validateIdempotency(
+      cancelOrderDto.eventId,
+    );
+    if (!shouldProcess) {
+      return;
     }
+
+    await this.orderModel
+      .updateOne(
+        {
+          _id: cancelOrderDto.orderId,
+        },
+        {
+          $set: {
+            status: 'canceled',
+          },
+          $push: {
+            statusHistory: {
+              eventId: cancelOrderDto.eventId,
+              status: 'canceled',
+              timestamp: new Date().toISOString(),
+              reason: cancelOrderDto.reason,
+            },
+          },
+        },
+      )
+      .exec();
   }
 
   private async validateIdempotency(eventId: string): Promise<boolean> {

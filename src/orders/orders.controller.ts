@@ -10,10 +10,10 @@ import { CreatePaymentResponseDto } from 'src/payment/dto/create-payment-respons
 export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
-    @Inject('ORDER') private readonly orderServiceClient: ClientProxy,
+    @Inject('ORDER') private readonly orderQueue: ClientProxy,
     @Inject('ORDER_STOCK_RESERVATION')
-    private readonly orderStockReservationClient: ClientProxy,
-    @Inject('ORDER_PAYMENT') private readonly orderPaymentClient: ClientProxy,
+    private readonly stockReservationQueue: ClientProxy,
+    @Inject('ORDER_PAYMENT') private readonly paymentQueue: ClientProxy,
   ) {}
 
   @EventPattern('orders.create')
@@ -22,17 +22,35 @@ export class OrdersController {
   }
 
   @EventPattern('payment.result')
-  handlePaymentResult(
-    @Payload() paymentResult: EventData<CreatePaymentResponseDto>,
+  async handlePaymentResult(
+    @Payload() payload: EventData<CreatePaymentResponseDto>,
   ) {
-    // Logic to handle payment result
-    console.log('Payment: ', paymentResult);
+    if (!payload.data.success) {
+      console.log('Canceling order', payload.data.orderId);
+      await this.ordersService.cancelOrder({
+        eventId: payload.eventId,
+        orderId: payload.data.orderId,
+        reason: payload.data.message,
+      });
+      return;
+    }
+
+    console.log('Payment: ', payload);
   }
 
   @EventPattern('stock.reservation.result')
-  handleStockReservationResult(
+  async handleStockReservationResult(
     @Payload() payload: EventData<CreateStockReservationResponseDto>,
   ) {
+    if (!payload.data.success) {
+      console.log('Canceling order', payload.data.orderId);
+      await this.ordersService.cancelOrder({
+        eventId: payload.eventId,
+        orderId: payload.data.orderId,
+        reason: payload.data.message,
+      });
+      return;
+    }
     // Logic to handle stock reservation
     console.log('Stock Reservation:', payload);
   }

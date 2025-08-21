@@ -19,6 +19,7 @@ export class StockService {
         'stock.reservation.result',
         new EventData<CreateStockReservationResponseDto>({
           success: true,
+          orderId: createStockDto.orderId,
           reservationId: apiResponse.reservationId,
           message: apiResponse.message,
         }),
@@ -29,6 +30,7 @@ export class StockService {
         'stock.reservation.result',
         new EventData<CreateStockReservationResponseDto>({
           success: false,
+          orderId: createStockDto.orderId,
           message: apiResponse.message,
         }),
       );
@@ -39,23 +41,25 @@ export class StockService {
     createReservationStockDto: CreateStockReservationDto,
   ): Promise<CreateStockReservationResponseDto> {
     console.log(
-      `Reserving stock for OrderId: ${createReservationStockDto.orderId}, ProductId: ${createReservationStockDto.productId}, Quantity: ${createReservationStockDto.quantity}`,
+      `Reserving stock for OrderId: ${createReservationStockDto.orderId}`,
     );
     // API delay
     await new Promise((resolve) => setTimeout(resolve, Math.random() * 10000));
 
     // Simulate 60% chance of success
     if (Math.random() < 0.6) {
-      console.log('Stock reserved successfully');
+      // console.log('Stock reserved successfully');
       return {
         success: true,
+        orderId: createReservationStockDto.orderId,
         reservationId: Math.floor(Math.random() * 100000),
         message: 'Stock reserved successfully',
       };
     } else {
-      console.log('Error reserving stock');
+      // console.log('Error reserving stock');
       return {
         success: false,
+        orderId: createReservationStockDto.orderId,
         message:
           'Failed to reserve stock due to insufficient inventory or API error',
       };
