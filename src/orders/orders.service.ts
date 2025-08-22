@@ -16,6 +16,7 @@ import { ConfirmPaymentResponseDto } from 'src/payment/dto/confirm-payment-respo
 import { ConfirmStockReservationReponseDto } from 'src/stock/dto/confirm-stock-reservation-response.dto';
 import { CreateOrderReportDto } from './dto/create-report.dto';
 import { OrderReport } from './schemas/order-report.schema';
+import { AggregationResult } from './dto/aggregation-result.dto';
 
 @Injectable()
 export class OrdersService {
@@ -399,7 +400,7 @@ export class OrdersService {
 
     const timestamp = payload.data.timestamp;
 
-    const aggregations = await this.orderModel
+    const aggregationResult = (await this.orderModel
       .aggregate([
         {
           $match: {
@@ -415,34 +416,28 @@ export class OrdersService {
           },
         },
         {
-          $project: {
-            _id: 0,
-            status: '$_id',
-            count: '$count',
-          },
-        },
-        {
           $group: {
             _id: null,
-            // Crie um objeto com os campos "k" e "v" para cada item
             data: {
               $push: {
-                k: '$status',
+                k: '$_id',
                 v: '$count',
               },
             },
           },
         },
         {
-          $replaceWith: {
-            $arrayToObject: '$data',
+          $replaceRoot: {
+            newRoot: { $arrayToObject: '$data' },
           },
         },
       ])
-      .exec();
+      .exec()) as AggregationResult[];
+
+    const reportData = aggregationResult[0] || {};
 
     const newModel = {
-      ...aggregations,
+      ...reportData,
       eventId: eventId,
       timestamp,
     };
