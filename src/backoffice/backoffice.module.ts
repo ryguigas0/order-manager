@@ -4,15 +4,18 @@ import { ClientsModule } from '@nestjs/microservices';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BackofficeService } from './backoffice.service';
 import { DeadLetter, DeadLetterSchema } from './schemas/dead-letter.schema';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getRmqOptions } from 'src/config/rmq-client.config';
+import { getMongooseOptions } from 'src/config/mdb-client.config';
 
 @Module({
   imports: [
-    MongooseModule.forRoot(
-      'mongodb://root:root@localhost:27017/order_manager',
-      { authSource: 'admin' },
-    ),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        getMongooseOptions(configService),
+    }),
     MongooseModule.forFeature([
       { name: DeadLetter.name, schema: DeadLetterSchema },
     ]),

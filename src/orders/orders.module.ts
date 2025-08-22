@@ -5,15 +5,18 @@ import { ClientsModule } from '@nestjs/microservices';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Order, OrderSchema } from './schemas/order.schema';
 import { OrderReport, OrderReportSchema } from './schemas/order-report.schema';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getRmqOptions } from 'src/config/rmq-client.config';
+import { getMongooseOptions } from 'src/config/mdb-client.config';
 
 @Module({
   imports: [
-    MongooseModule.forRoot(
-      'mongodb://root:root@localhost:27017/order_manager',
-      { authSource: 'admin' },
-    ),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        getMongooseOptions(configService),
+    }),
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
       { name: OrderReport.name, schema: OrderReportSchema },
@@ -23,19 +26,19 @@ import { getRmqOptions } from 'src/config/rmq-client.config';
         name: 'ORDER',
         inject: [ConfigService],
         useFactory: (configService: ConfigService) =>
-          getRmqOptions('orders', configService), // Fila 'orders'
+          getRmqOptions('orders', configService),
       },
       {
         name: 'ORDER_PAYMENT',
         inject: [ConfigService],
         useFactory: (configService: ConfigService) =>
-          getRmqOptions('payment', configService), // Fila 'payment'
+          getRmqOptions('payment', configService),
       },
       {
         name: 'ORDER_STOCK_RESERVATION',
         inject: [ConfigService],
         useFactory: (configService: ConfigService) =>
-          getRmqOptions('stock', configService), // Fila 'stock'
+          getRmqOptions('stock', configService),
       },
     ]),
   ],
