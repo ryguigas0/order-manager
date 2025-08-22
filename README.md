@@ -51,6 +51,11 @@ curl --location --request POST 'http://localhost:3000/backoffice/orders' --heade
 }'
 ```
 
+### List ready orders
+```bash
+curl 'http://localhost:3000/orders/ready'
+```
+
 ## Run tests
 
 ```bash

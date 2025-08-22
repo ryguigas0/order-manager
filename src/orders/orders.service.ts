@@ -23,6 +23,10 @@ export class OrdersService {
     @InjectModel(Order.name) private orderModel: Model<Order>,
   ) {}
 
+  async getReadyOrders(): Promise<HydratedDocument<Order>[]> {
+    return await this.orderModel.find({ status: OrderStatus.ready }).exec();
+  }
+
   async handleCreateOrder(payload: EventData<CreateOrderDto>) {
     const shouldProcess = await this.validateIdempotency(payload.eventId);
     if (!shouldProcess) {
@@ -259,7 +263,8 @@ export class OrdersService {
     console.log(
       `Confirming stock reservation for order ${updateOrderStockReservation.orderId}`,
     );
-    const updatedOrder = await this.orderModel
+
+    await this.orderModel
       .updateOne(
         {
           _id: updateOrderStockReservation.orderId,
@@ -279,16 +284,6 @@ export class OrdersService {
         },
       )
       .exec();
-
-    // this.paymentQueue.emit(
-    //   'stock.reservation.confirm',
-    //   new EventData<ConfirmStockReservationDto>({
-    //     orderId: order._id.toString(),
-    //     reservationId: updateOrderStockReservation.reservationId,
-    //   }),
-    // );
-
-    console.log({ ready: updatedOrder });
   }
 
   async getOrder(orderId: string): Promise<HydratedDocument<Order> | null> {

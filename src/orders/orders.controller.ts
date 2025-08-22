@@ -1,22 +1,21 @@
-import { Controller, Inject } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { ClientProxy, EventPattern, Payload } from '@nestjs/microservices';
+import { EventPattern, Payload } from '@nestjs/microservices';
 import { EventData } from 'src/util/EventData';
 import { CreatePaymentResponseDto } from 'src/payment/dto/create-payment-response.dto';
 import { CreateStockReservationResponseDto } from 'src/stock/dto/create-stock-reservation-response.dto';
 import { ConfirmPaymentResponseDto } from 'src/payment/dto/confirm-payment-response.dto';
 import { ConfirmStockReservationReponseDto } from 'src/stock/dto/confirm-stock-reservation-response.dto';
 
-@Controller()
+@Controller('/orders')
 export class OrdersController {
-  constructor(
-    private readonly ordersService: OrdersService,
-    @Inject('ORDER') private readonly orderQueue: ClientProxy,
-    @Inject('ORDER_STOCK_RESERVATION')
-    private readonly stockReservationQueue: ClientProxy,
-    @Inject('ORDER_PAYMENT') private readonly paymentQueue: ClientProxy,
-  ) {}
+  constructor(private readonly ordersService: OrdersService) {}
+
+  @Get('ready')
+  async getReadyOrders() {
+    return await this.ordersService.getReadyOrders();
+  }
 
   @EventPattern('orders.create')
   async handleCreateOrder(@Payload() payload: EventData<CreateOrderDto>) {
