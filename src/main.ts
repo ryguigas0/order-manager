@@ -9,6 +9,7 @@ async function bootstrap() {
     transport: Transport.RMQ,
     options: {
       urls: ['amqp://guest:guest@localhost:5672'],
+      queue: 'server',
       exchange: 'orders',
       exchangeType: 'topic',
       wildcards: true,

@@ -50,24 +50,7 @@ export class OrdersController {
   async handlePaymentConfirmResult(
     @Payload() payload: EventData<ConfirmPaymentResponseDto>,
   ) {
-    const { orderId, message } = payload.data;
-
-    if (!payload.data.success || !payload.data.paymentId) {
-      console.log('Canceling order', payload.data.orderId);
-      await this.ordersService.cancelOrder({
-        eventId: payload.eventId,
-        orderId: orderId,
-        reason: message,
-      });
-      return;
-    }
-
-    await this.ordersService.handleOrderPaymentConfirmed({
-      eventId: payload.eventId,
-      paymentId: payload.data.paymentId,
-      orderId: payload.data.orderId,
-      reason: payload.data.message,
-    });
+    await this.ordersService.handleOrderPaymentConfirmed(payload);
   }
 
   @EventPattern('stock.reservation.create.result')

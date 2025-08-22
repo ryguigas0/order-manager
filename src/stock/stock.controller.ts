@@ -20,6 +20,6 @@ export class StockController {
   async handleConfirmReserveStock(
     @Payload() payload: EventData<ConfirmStockReservationDto>,
   ) {
-    await this.stockService.confirm(payload.data);
+    await this.stockService.confirm(payload);
   }
 }

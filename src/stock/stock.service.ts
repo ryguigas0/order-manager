@@ -68,9 +68,9 @@ export class StockService {
     }
   }
 
-  async confirm(
-    confirmStockReservationDto: ConfirmStockReservationDto,
-  ): Promise<void> {
+  async confirm(event: EventData<ConfirmStockReservationDto>): Promise<void> {
+    const confirmStockReservationDto = event.data;
+
     const apiResponse = await this.callConfirmStockReservation(
       confirmStockReservationDto,
     );
@@ -87,14 +87,18 @@ export class StockService {
         }),
       );
     } else {
-      console.error(`Stock reservation confirmed: ${apiResponse.message}`);
+      console.error(`Stock reservation confirm error: ${apiResponse.message}`);
       this.stockQueueClient.emit(
         'stock.reservation.confirm.result',
-        new EventData<CreateStockReservationResponseDto>({
-          success: false,
-          orderId: confirmStockReservationDto.orderId,
-          message: apiResponse.message,
-        }),
+        new EventData<CreateStockReservationResponseDto>(
+          {
+            success: false,
+            orderId: confirmStockReservationDto.orderId,
+            message: apiResponse.message,
+          },
+          event.currentTry,
+          event.backoff,
+        ),
       );
     }
   }

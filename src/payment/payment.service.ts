@@ -45,7 +45,7 @@ export class PaymentService {
   ): Promise<CreatePaymentResponseDto> {
     console.log(`Creating payment for OrderId: ${createPaymentDto.orderId}`);
     // API delay
-    await new Promise((resolve) => setTimeout(resolve, Math.random() * 10000));
+    await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
 
     // Simulate 99% chance of success
     if (Math.random() < 0.99) {
@@ -53,7 +53,7 @@ export class PaymentService {
       return {
         orderId: createPaymentDto.orderId,
         success: true,
-        paymentId: Math.floor(Math.random() * 100000),
+        paymentId: Math.floor(Math.random() * 10000),
         message: 'Payment created successfully',
       };
     } else {
@@ -66,29 +66,39 @@ export class PaymentService {
     }
   }
 
-  async confirmPayment(confirmPaymentDto: ConfirmPaymentDto): Promise<void> {
-    const apiResponse = await this.callConfirmPayment(confirmPaymentDto);
+  async confirmPayment(event: EventData<ConfirmPaymentDto>): Promise<void> {
+    const { data } = event;
+
+    const apiResponse = await this.callConfirmPayment(data);
 
     if (apiResponse.success) {
       console.log(`Payment confimed: ${apiResponse.paymentId}`);
       this.paymentQueueClient.emit(
         'payment.confirm.result',
-        new EventData<CreatePaymentResponseDto>({
-          success: true,
-          orderId: confirmPaymentDto.orderId,
-          paymentId: apiResponse.paymentId,
-          message: apiResponse.message,
-        }),
+        new EventData<CreatePaymentResponseDto>(
+          {
+            success: true,
+            orderId: data.orderId,
+            paymentId: apiResponse.paymentId,
+            message: apiResponse.message,
+          },
+          event.currentTry,
+          event.backoff,
+        ),
       );
     } else {
-      console.error(`Payment creation failed: ${apiResponse.message}`);
+      console.error(`Payment confirmation failed: ${apiResponse.message}`);
       this.paymentQueueClient.emit(
         'payment.confirm.result',
-        new EventData<CreatePaymentResponseDto>({
-          orderId: confirmPaymentDto.orderId,
-          success: false,
-          message: apiResponse.message,
-        }),
+        new EventData<CreatePaymentResponseDto>(
+          {
+            orderId: data.orderId,
+            success: false,
+            message: apiResponse.message,
+          },
+          event.currentTry,
+          event.backoff,
+        ),
       );
     }
   }
@@ -96,12 +106,13 @@ export class PaymentService {
   async callConfirmPayment(
     confirmPaymentDto: ConfirmPaymentDto,
   ): Promise<ConfirmPaymentResponseDto> {
+    // console.log(JSON.stringify(confirmPaymentDto));
     console.log(`Confirming payment for OrderId: ${confirmPaymentDto.orderId}`);
     // API delay
-    await new Promise((resolve) => setTimeout(resolve, Math.random() * 10000));
+    await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
 
-    // Simulate 99% chance of success
-    if (Math.random() < 0.99) {
+    // Simulate chance of success
+    if (Math.random() < 0.01) {
       // console.log('Payment created successfully');
       return {
         orderId: confirmPaymentDto.orderId,

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
+import { ClientProxy, RmqRecordBuilder } from '@nestjs/microservices';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreatePaymentDto } from 'src/payment/dto/create-payment.dto';
 import { CreateStockReservationDto } from 'src/stock/dto/create-stock-reservation.dto';
@@ -12,6 +12,7 @@ import { ConfirmPaymentDto } from 'src/payment/dto/confirm-payment.dto';
 import { UpdateOrderPaymentDto } from './dto/update-order-payment.dto';
 import { ConfirmStockReservationDto } from 'src/stock/dto/confirm-stock-reservation.dto';
 import { UpdateOrderStockReservationDto } from './dto/update-order-stock-reservation.dto';
+import { ConfirmPaymentResponseDto } from 'src/payment/dto/confirm-payment-response.dto';
 
 @Injectable()
 export class OrdersService {
@@ -65,9 +66,11 @@ export class OrdersService {
       billingAddress: order.customer.address.billing,
     };
 
-    await this.paymentQueue
-      .emit('payment.create', new EventData<CreatePaymentDto>(paymentPayload))
-      .toPromise();
+    await this.emitMessage(
+      this.paymentQueue,
+      'payment.create',
+      new EventData<CreatePaymentDto>(paymentPayload),
+    );
   }
 
   async handleOrderPaymentCreated(updateOrderPayment: UpdateOrderPaymentDto) {
@@ -117,7 +120,8 @@ export class OrdersService {
       )
       .exec();
 
-    this.paymentQueue.emit(
+    await this.emitMessage(
+      this.paymentQueue,
       'payment.confirm',
       new EventData<ConfirmPaymentDto>({
         orderId: order._id.toString(),
@@ -126,34 +130,71 @@ export class OrdersService {
     );
   }
 
-  async handleOrderPaymentConfirmed(updateOrderPayment: UpdateOrderPaymentDto) {
-    const shouldProcess = await this.validateIdempotency(
-      updateOrderPayment.eventId,
-    );
+  async handleOrderPaymentConfirmed(
+    event: EventData<ConfirmPaymentResponseDto>,
+  ) {
+    const { eventId, currentTry, data } = event;
+    const { orderId, message } = data;
+
+    const shouldProcess = await this.validateIdempotency(eventId);
     if (!shouldProcess) {
       return;
     }
 
-    const order = await this.getOrder(updateOrderPayment.orderId);
+    const order = await this.getOrder(orderId);
 
     if (!order) {
-      throw new Error('Order not found for confirming payment');
+      console.log(`Order ${orderId} not found`);
+      return;
     }
 
     if (order.status !== OrderStatus.pendingPayment) {
       console.log(
-        `Order ${updateOrderPayment.orderId} is not in a valid state for confirming payment ${order.status}`,
+        `Order ${orderId} is not in a valid state for confirming payment ${order.status}`,
       );
       return;
     }
 
-    console.log(
-      `Setting payment confirmed for order ${updateOrderPayment.orderId}`,
-    );
+    if (!order.payment.paymentId) {
+      console.log(`Order ${orderId} without payment to confirm`);
+      return;
+    }
+
+    if (!data.success) {
+      if (event.currentTry <= event.backoff.maxTries) {
+        console.log('Retry', currentTry + 1, 'confirm payment', orderId);
+
+        const retryEvent = new EventData<ConfirmPaymentDto>(
+          {
+            orderId: order._id.toString(),
+            paymentId: order.payment.paymentId,
+          },
+          currentTry + 1,
+          { ...event.backoff },
+        );
+
+        await this.emitMessage(
+          this.paymentQueue,
+          'payment.confirm',
+          retryEvent,
+          retryEvent.backoff.delay + Math.pow(5, retryEvent.currentTry) * 1000,
+        );
+      } else {
+        console.log('Canceling order', orderId);
+        await this.cancelOrder({
+          eventId: eventId,
+          orderId: orderId,
+          reason: message,
+        });
+      }
+      return;
+    }
+
+    console.log(`Setting payment confirmed for order ${orderId}`);
     await this.orderModel
       .updateOne(
         {
-          _id: updateOrderPayment.orderId,
+          _id: orderId,
         },
         {
           $set: {
@@ -161,17 +202,18 @@ export class OrdersService {
           },
           $push: {
             statusHistory: {
-              eventId: updateOrderPayment.eventId,
+              eventId: eventId,
               status: OrderStatus.pendingStock,
               timestamp: new Date().toISOString(),
-              reason: updateOrderPayment.reason,
+              reason: message,
             },
           },
         },
       )
       .exec();
 
-    this.paymentQueue.emit(
+    await this.emitMessage(
+      this.stockQueue,
       'stock.reservation.create',
       new EventData<CreateStockReservationDto>({
         orderId: order._id.toString(),
@@ -228,7 +270,8 @@ export class OrdersService {
       )
       .exec();
 
-    this.paymentQueue.emit(
+    await this.emitMessage(
+      this.paymentQueue,
       'stock.reservation.confirm',
       new EventData<ConfirmStockReservationDto>({
         orderId: order._id.toString(),
@@ -330,5 +373,27 @@ export class OrdersService {
       .exec();
 
     return order === null;
+  }
+
+  async emitMessage(
+    queue: ClientProxy,
+    queueName: string,
+    message: EventData<any>,
+    delay?: number,
+  ): Promise<void> {
+    if (!delay) {
+      await queue.emit(queueName, message).toPromise();
+      return;
+    }
+
+    const delayedMessage = new RmqRecordBuilder(message)
+      .setOptions({
+        headers: {
+          'x-delay': delay.toString(),
+        },
+      })
+      .build();
+
+    await queue.emit(queueName, delayedMessage).toPromise();
   }
 }
