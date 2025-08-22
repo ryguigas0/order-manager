@@ -5,6 +5,8 @@ import { CreateOrderDto } from 'src/orders/dto/create-order.dto';
 import { EventData } from 'src/util/EventData';
 import { DeadLetter } from './schemas/dead-letter.schema';
 import { Model } from 'mongoose';
+import { Cron } from '@nestjs/schedule';
+import { CreateOrderReportDto } from 'src/orders/dto/create-report.dto';
 
 @Injectable()
 export class BackofficeService {
@@ -27,17 +29,27 @@ export class BackofficeService {
     const msg = ctx.getMessage();
     const channel = ctx.getChannelRef();
 
-    console.log({ msg, channel });
+    const newDeadLetter = new this.deadLetterModel({
+      payload: payload,
+      context: {
+        message: msg,
+        channel: channel,
+      },
+    });
 
-    // const newDeadLetter = new this.deadLetterModel({
-    //   payload: payload,
-    //   context: {
-    //     message: ,
-    //     channel: ,
-    //   },
-    // });
-
-    // await newDeadLetter.save();
+    await newDeadLetter.save();
     return;
+  }
+
+  @Cron('*/3 * * * * * ')
+  async generateReport() {
+    const timestamp = new Date().toISOString();
+    await this.orderQueue
+      .emit(
+        'orders.reports.create',
+        new EventData<CreateOrderReportDto>({ timestamp }),
+      )
+      .toPromise();
+    console.debug('Order report creation sent:', timestamp);
   }
 }

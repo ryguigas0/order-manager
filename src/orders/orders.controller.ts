@@ -7,6 +7,7 @@ import { CreatePaymentResponseDto } from 'src/payment/dto/create-payment-respons
 import { CreateStockReservationResponseDto } from 'src/stock/dto/create-stock-reservation-response.dto';
 import { ConfirmPaymentResponseDto } from 'src/payment/dto/confirm-payment-response.dto';
 import { ConfirmStockReservationReponseDto } from 'src/stock/dto/confirm-stock-reservation-response.dto';
+import { CreateOrderReportDto } from './dto/create-report.dto';
 
 @Controller('/orders')
 export class OrdersController {
@@ -20,6 +21,13 @@ export class OrdersController {
   @EventPattern('orders.create')
   async handleCreateOrder(@Payload() payload: EventData<CreateOrderDto>) {
     await this.ordersService.handleCreateOrder(payload);
+  }
+
+  @EventPattern('orders.reports.create')
+  async handleCreateReport(
+    @Payload() payload: EventData<CreateOrderReportDto>,
+  ) {
+    await this.ordersService.handleCreateReport(payload);
   }
 
   @EventPattern('payment.create.result')

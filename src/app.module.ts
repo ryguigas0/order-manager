@@ -5,9 +5,16 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentModule } from './payment/payment.module';
 import { StockModule } from './stock/stock.module';
 import { BackofficeModule } from './backoffice/backoffice.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
-  imports: [OrdersModule, StockModule, PaymentModule, BackofficeModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    OrdersModule,
+    StockModule,
+    PaymentModule,
+    BackofficeModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

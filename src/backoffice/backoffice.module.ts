@@ -41,7 +41,7 @@ import { DeadLetter, DeadLetterSchema } from './schemas/dead-letter.schema';
         options: {
           urls: ['amqp://guest:guest@localhost:5672'],
           queue: 'dlq',
-          exchange: 'infra',
+          exchange: 'orders',
           exchangeType: 'topic',
           persistent: true,
           queueOptions: {

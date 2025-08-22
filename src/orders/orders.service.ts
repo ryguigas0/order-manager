@@ -14,6 +14,8 @@ import { ConfirmStockReservationDto } from 'src/stock/dto/confirm-stock-reservat
 import { UpdateOrderStockReservationDto } from './dto/update-order-stock-reservation.dto';
 import { ConfirmPaymentResponseDto } from 'src/payment/dto/confirm-payment-response.dto';
 import { ConfirmStockReservationReponseDto } from 'src/stock/dto/confirm-stock-reservation-response.dto';
+import { CreateOrderReportDto } from './dto/create-report.dto';
+import { OrderReport } from './schemas/order-report.schema';
 
 @Injectable()
 export class OrdersService {
@@ -23,6 +25,7 @@ export class OrdersService {
     @Inject('ORDER_STOCK_RESERVATION')
     private readonly stockQueue: ClientProxy,
     @InjectModel(Order.name) private orderModel: Model<Order>,
+    @InjectModel(OrderReport.name) private orderReportModel: Model<OrderReport>,
   ) {}
 
   async getReadyOrders(): Promise<HydratedDocument<Order>[]> {
@@ -30,7 +33,7 @@ export class OrdersService {
   }
 
   async handleCreateOrder(payload: EventData<CreateOrderDto>) {
-    const shouldProcess = await this.validateIdempotency(payload.eventId);
+    const shouldProcess = await this.validateOrderIdempotency(payload.eventId);
     if (!shouldProcess) {
       return;
     }
@@ -75,7 +78,7 @@ export class OrdersService {
   }
 
   async handleOrderPaymentCreated(updateOrderPayment: UpdateOrderPaymentDto) {
-    const shouldProcess = await this.validateIdempotency(
+    const shouldProcess = await this.validateOrderIdempotency(
       updateOrderPayment.eventId,
     );
     if (!shouldProcess) {
@@ -137,7 +140,7 @@ export class OrdersService {
     const { eventId, currentTry, data } = event;
     const { orderId, message } = data;
 
-    const shouldProcess = await this.validateIdempotency(eventId);
+    const shouldProcess = await this.validateOrderIdempotency(eventId);
     if (!shouldProcess) {
       return;
     }
@@ -226,7 +229,7 @@ export class OrdersService {
   async handleStockReservationCreated(
     updateOrderStockReservation: UpdateOrderStockReservationDto,
   ) {
-    const shouldProcess = await this.validateIdempotency(
+    const shouldProcess = await this.validateOrderIdempotency(
       updateOrderStockReservation.eventId,
     );
     if (!shouldProcess) {
@@ -287,7 +290,7 @@ export class OrdersService {
     const { eventId, currentTry, data } = event;
     const { orderId, message } = data;
 
-    const shouldProcess = await this.validateIdempotency(eventId);
+    const shouldProcess = await this.validateOrderIdempotency(eventId);
     if (!shouldProcess) {
       return;
     }
@@ -370,12 +373,68 @@ export class OrdersService {
       .exec();
   }
 
+  async handleCreateReport(payload: EventData<CreateOrderReportDto>) {
+    const eventId = payload.eventId;
+
+    const shouldProcess = await this.validateOrderReportIdempotency(eventId);
+    if (!shouldProcess) return;
+
+    const timestamp = payload.data.timestamp;
+
+    const aggregations = await this.orderModel
+      .aggregate([
+        {
+          $match: {
+            status: {
+              $in: [
+                'pending',
+                'pendingPayment',
+                'pendingStock',
+                'ready',
+                'shipped',
+                'delivered',
+                'canceled',
+              ],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: '$status',
+            count: {
+              $sum: 1,
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            status: '$_id',
+            count: '$count',
+          },
+        },
+      ])
+      .exec();
+
+    console.log({ aggregations });
+
+    const newReport = new this.orderReportModel({
+      ...aggregations,
+      eventId: eventId,
+      timestamp,
+    });
+
+    await newReport.save();
+
+    console.log('Created report ', timestamp);
+  }
+
   async getOrder(orderId: string): Promise<HydratedDocument<Order> | null> {
     return this.orderModel.findById(orderId).exec();
   }
 
   async cancelOrder(updateOrderDto: UpdateOrderDto) {
-    const shouldProcess = await this.validateIdempotency(
+    const shouldProcess = await this.validateOrderIdempotency(
       updateOrderDto.eventId,
     );
     if (!shouldProcess) {
@@ -404,7 +463,7 @@ export class OrdersService {
       .exec();
   }
 
-  private async validateIdempotency(eventId: string): Promise<boolean> {
+  private async validateOrderIdempotency(eventId: string): Promise<boolean> {
     const order = await this.orderModel
       .findOne({
         statusHistory: {
@@ -414,6 +473,18 @@ export class OrdersService {
       .exec();
 
     return order === null;
+  }
+
+  private async validateOrderReportIdempotency(
+    eventId: string,
+  ): Promise<boolean> {
+    const report = await this.orderReportModel
+      .findOne({
+        eventId,
+      })
+      .exec();
+
+    return report === null;
   }
 
   async emitMessage(
