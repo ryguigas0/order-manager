@@ -56,6 +56,11 @@ curl --location --request POST 'http://localhost:3000/backoffice/orders' --heade
 curl 'http://localhost:3000/orders/ready'
 ```
 
+### List generated reports
+```bash
+curl 'http://localhost:3000/orders/reports'
+```
+
 ## Run tests
 
 ```bash

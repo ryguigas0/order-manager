@@ -32,6 +32,19 @@ export class OrdersService {
     return await this.orderModel.find({ status: OrderStatus.ready }).exec();
   }
 
+  async getOrderReports(
+    pageSize?: number,
+  ): Promise<HydratedDocument<OrderReport>[]> {
+    let size = 10;
+    if (pageSize) size = pageSize;
+
+    return await this.orderReportModel
+      .find({})
+      .sort({ timestamp: -1 })
+      .limit(size)
+      .exec();
+  }
+
   async handleCreateOrder(payload: EventData<CreateOrderDto>) {
     const shouldProcess = await this.validateOrderIdempotency(payload.eventId);
     if (!shouldProcess) {
@@ -385,17 +398,7 @@ export class OrdersService {
       .aggregate([
         {
           $match: {
-            status: {
-              $in: [
-                'pending',
-                'pendingPayment',
-                'pendingStock',
-                'ready',
-                'shipped',
-                'delivered',
-                'canceled',
-              ],
-            },
+            status: { $ne: null },
           },
         },
         {
@@ -413,18 +416,39 @@ export class OrdersService {
             count: '$count',
           },
         },
+        {
+          $group: {
+            _id: null,
+            // Crie um objeto com os campos "k" e "v" para cada item
+            data: {
+              $push: {
+                k: '$status',
+                v: '$count',
+              },
+            },
+          },
+        },
+        {
+          $replaceWith: {
+            $arrayToObject: '$data',
+          },
+        },
       ])
       .exec();
 
-    console.log({ aggregations });
-
-    const newReport = new this.orderReportModel({
+    const newModel = {
       ...aggregations,
       eventId: eventId,
       timestamp,
-    });
+    };
 
-    await newReport.save();
+    console.log({ newModel });
+
+    const newReport = new this.orderReportModel(newModel);
+
+    const savedReport = await newReport.save();
+
+    console.log({ savedReport });
 
     console.log('Created report ', timestamp);
   }

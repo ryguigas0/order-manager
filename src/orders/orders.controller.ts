@@ -18,6 +18,11 @@ export class OrdersController {
     return await this.ordersService.getReadyOrders();
   }
 
+  @Get('reports')
+  async getOrderReports() {
+    return await this.ordersService.getOrderReports();
+  }
+
   @EventPattern('orders.create')
   async handleCreateOrder(@Payload() payload: EventData<CreateOrderDto>) {
     await this.ordersService.handleCreateOrder(payload);

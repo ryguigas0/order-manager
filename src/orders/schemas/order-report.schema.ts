@@ -17,10 +17,10 @@ export class OrderReport {
   pending: number;
 
   @Prop()
-  pendingPayment: number;
+  'pending-payment': number;
 
   @Prop()
-  pendingStock: number;
+  'pending-stock': number;
 
   @Prop()
   ready: number;
