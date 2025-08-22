@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { CreatePaymentResponseDto } from './dto/create-payment-response.dto';
 import { ClientProxy } from '@nestjs/microservices';
@@ -12,12 +12,13 @@ export class PaymentService {
   constructor(
     @Inject('PAYMENT') private readonly paymentQueueClient: ClientProxy,
   ) {}
+  private readonly logger = new Logger(PaymentService.name);
 
   async createPayment(createPaymentDto: CreatePaymentDto) {
     const apiResponse = await this.callCreatePayment(createPaymentDto);
 
     if (apiResponse.success) {
-      console.log(`Payment creation: ${apiResponse.paymentId}`);
+      this.logger.debug(`Payment creation: ${apiResponse.paymentId}`);
       this.paymentQueueClient.emit(
         'payment.create.result',
         new EventData<CreatePaymentResponseDto>({
@@ -28,7 +29,7 @@ export class PaymentService {
         }),
       );
     } else {
-      console.error(`Payment creation failed: ${apiResponse.message}`);
+      this.logger.error(`Payment creation failed: ${apiResponse.message}`);
       this.paymentQueueClient.emit(
         'payment.create.result',
         new EventData<CreatePaymentResponseDto>({
@@ -43,13 +44,15 @@ export class PaymentService {
   async callCreatePayment(
     createPaymentDto: CreatePaymentDto,
   ): Promise<CreatePaymentResponseDto> {
-    console.log(`Creating payment for OrderId: ${createPaymentDto.orderId}`);
+    this.logger.debug(
+      `Creating payment for OrderId: ${createPaymentDto.orderId}`,
+    );
     // API delay
     await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
 
     // Simulate 99% chance of success
     if (Math.random() < 0.99) {
-      // console.log('Payment created successfully');
+      this.logger.debug('Payment created successfully');
       return {
         orderId: createPaymentDto.orderId,
         success: true,
@@ -57,7 +60,7 @@ export class PaymentService {
         message: 'Payment created successfully',
       };
     } else {
-      // console.log('Error creating payment');
+      this.logger.error('Error creating payment');
       return {
         orderId: createPaymentDto.orderId,
         success: false,
@@ -72,7 +75,7 @@ export class PaymentService {
     const apiResponse = await this.callConfirmPayment(data);
 
     if (apiResponse.success) {
-      console.log(`Payment confimed: ${apiResponse.paymentId}`);
+      this.logger.debug(`Payment confimed: ${apiResponse.paymentId}`);
       this.paymentQueueClient.emit(
         'payment.confirm.result',
         new EventData<CreatePaymentResponseDto>(
@@ -87,7 +90,7 @@ export class PaymentService {
         ),
       );
     } else {
-      console.error(`Payment confirmation failed: ${apiResponse.message}`);
+      this.logger.error(`Payment confirmation failed: ${apiResponse.message}`);
       this.paymentQueueClient.emit(
         'payment.confirm.result',
         new EventData<CreatePaymentResponseDto>(
@@ -106,14 +109,14 @@ export class PaymentService {
   async callConfirmPayment(
     confirmPaymentDto: ConfirmPaymentDto,
   ): Promise<ConfirmPaymentResponseDto> {
-    // console.log(JSON.stringify(confirmPaymentDto));
-    console.log(`Confirming payment for OrderId: ${confirmPaymentDto.orderId}`);
+    this.logger.debug(
+      `Confirming payment for OrderId: ${confirmPaymentDto.orderId}`,
+    );
     // API delay
     await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
 
-    // Simulate chance of success
     if (Math.random() < 0.4) {
-      // console.log('Payment created successfully');
+      this.logger.debug('Payment created successfully');
       return {
         orderId: confirmPaymentDto.orderId,
         success: true,
@@ -121,7 +124,7 @@ export class PaymentService {
         message: 'Payment confirmed successfully',
       };
     } else {
-      // console.log('Error creating payment');
+      this.logger.error('Error creating payment');
       return {
         orderId: confirmPaymentDto.orderId,
         success: false,

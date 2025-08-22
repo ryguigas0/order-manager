@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy, RmqRecordBuilder } from '@nestjs/microservices';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreatePaymentDto } from 'src/payment/dto/create-payment.dto';
@@ -27,6 +27,7 @@ export class OrdersService {
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(OrderReport.name) private orderReportModel: Model<OrderReport>,
   ) {}
+  private readonly logger = new Logger(OrdersService.name);
 
   async getReadyOrders(): Promise<HydratedDocument<Order>[]> {
     return await this.orderModel.find({ status: OrderStatus.ready }).exec();
@@ -73,8 +74,6 @@ export class OrdersService {
 
     const order = await createdOrder.save();
 
-    // console.log({ order });
-
     const paymentPayload: CreatePaymentDto = {
       orderId: order._id.toString(),
       amount: order.payment.totalAmount,
@@ -88,6 +87,8 @@ export class OrdersService {
       'payment.create',
       new EventData<CreatePaymentDto>(paymentPayload),
     );
+
+    this.logger.debug('Order created');
   }
 
   async handleOrderPaymentCreated(updateOrderPayment: UpdateOrderPaymentDto) {
@@ -101,17 +102,20 @@ export class OrdersService {
     const order = await this.getOrder(updateOrderPayment.orderId);
 
     if (!order) {
-      throw new Error('Order not found for setting payment');
+      this.logger.error('Order not found for setting payment');
+      return;
     }
 
     if (order.status !== OrderStatus.pending) {
-      console.log(
+      this.logger.error(
         `Order ${updateOrderPayment.orderId} is not in a valid state for setting payment`,
       );
       return;
     }
 
-    console.log(`Setting payment for order ${updateOrderPayment.orderId}`);
+    this.logger.debug(
+      `Setting payment for order ${updateOrderPayment.orderId}`,
+    );
     await this.orderModel
       .updateOne(
         {
@@ -161,25 +165,25 @@ export class OrdersService {
     const order = await this.getOrder(orderId);
 
     if (!order) {
-      console.log(`Order ${orderId} not found`);
+      this.logger.error(`Order ${orderId} not found`);
       return;
     }
 
     if (order.status !== OrderStatus.pendingPayment) {
-      console.log(
+      this.logger.error(
         `Order ${orderId} is not in a valid state for confirming payment ${order.status}`,
       );
       return;
     }
 
     if (!order.payment.paymentId) {
-      console.log(`Order ${orderId} without payment to confirm`);
+      this.logger.error(`Order ${orderId} without payment to confirm`);
       return;
     }
 
     if (!data.success) {
       if (event.currentTry <= event.backoff.maxTries) {
-        console.log('Retry', currentTry + 1, 'confirm payment', orderId);
+        this.logger.debug('Retry', currentTry + 1, 'confirm payment', orderId);
 
         const retryEvent = new EventData<ConfirmPaymentDto>(
           {
@@ -197,7 +201,7 @@ export class OrdersService {
           retryEvent.backoff.delay + Math.pow(5, retryEvent.currentTry) * 1000,
         );
       } else {
-        console.log('Canceling order', orderId);
+        this.logger.error('Canceling order', orderId);
         await this.cancelOrder({
           eventId: eventId,
           orderId: orderId,
@@ -207,7 +211,7 @@ export class OrdersService {
       return;
     }
 
-    console.log(`Setting payment confirmed for order ${orderId}`);
+    this.logger.debug(`Setting payment confirmed for order ${orderId}`);
     await this.orderModel
       .updateOne(
         {
@@ -252,17 +256,18 @@ export class OrdersService {
     const order = await this.getOrder(updateOrderStockReservation.orderId);
 
     if (!order) {
-      throw new Error('Order not found for setting stock reservation');
+      this.logger.error('Order not found for setting stock reservation');
+      return;
     }
 
     if (order.status !== OrderStatus.pendingStock) {
-      console.log(
+      this.logger.error(
         `Order ${updateOrderStockReservation.orderId} is not in a valid state for setting stock reservation`,
       );
       return;
     }
 
-    console.log(
+    this.logger.debug(
       `Setting stock reservation for order ${updateOrderStockReservation.orderId}`,
     );
     await this.orderModel
@@ -311,25 +316,25 @@ export class OrdersService {
     const order = await this.getOrder(orderId);
 
     if (!order) {
-      console.log('Order not found for confirming stock reservation');
+      this.logger.error('Order not found for confirming stock reservation');
       return;
     }
 
     if (order.status !== OrderStatus.pendingStock) {
-      console.log(
+      this.logger.error(
         `Order ${orderId} is not in a valid state for confirming stock reservation`,
       );
       return;
     }
 
     if (!order.stockReservationId) {
-      console.log(`Order ${orderId} without stock reservation`);
+      this.logger.error(`Order ${orderId} without stock reservation`);
       return;
     }
 
     if (!data.success) {
       if (event.currentTry <= event.backoff.maxTries) {
-        console.log(
+        this.logger.debug(
           'Retry',
           currentTry + 1,
           'confirm stock reservation',
@@ -352,7 +357,7 @@ export class OrdersService {
           retryEvent.backoff.delay + Math.pow(5, retryEvent.currentTry) * 1000,
         );
       } else {
-        console.log('Canceling order', orderId);
+        this.logger.error('Canceling order', orderId);
         await this.cancelOrder({
           eventId: eventId,
           orderId: orderId,
@@ -362,7 +367,7 @@ export class OrdersService {
       return;
     }
 
-    console.log(`Confirming stock reservation for order ${orderId}`);
+    this.logger.debug(`Confirming stock reservation for order ${orderId}`);
 
     await this.orderModel
       .updateOne(
@@ -450,7 +455,7 @@ export class OrdersService {
 
     console.log({ savedReport });
 
-    console.log('Created report ', timestamp);
+    this.logger.debug('Created report ', timestamp);
   }
 
   async getOrder(orderId: string): Promise<HydratedDocument<Order> | null> {

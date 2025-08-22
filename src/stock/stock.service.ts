@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CreateStockReservationDto } from './dto/create-stock-reservation.dto';
 import { CreateStockReservationResponseDto } from './dto/create-stock-reservation-response.dto';
 import { ClientProxy } from '@nestjs/microservices';
@@ -11,12 +11,15 @@ export class StockService {
   constructor(
     @Inject('STOCK') private readonly stockQueueClient: ClientProxy,
   ) {}
+  private readonly logger = new Logger(StockService.name);
 
   async create(createStockDto: CreateStockReservationDto): Promise<void> {
     const apiResponse = await this.callReserveStock(createStockDto);
 
     if (apiResponse.success) {
-      // console.log(`Stock reservation successful: ${apiResponse.reservationId}`);
+      this.logger.debug(
+        `Stock reservation successful: ${apiResponse.reservationId}`,
+      );
       this.stockQueueClient.emit(
         'stock.reservation.create.result',
         new EventData<CreateStockReservationResponseDto>({
@@ -27,7 +30,7 @@ export class StockService {
         }),
       );
     } else {
-      // console.error(`Stock reservation failed: ${apiResponse.message}`);
+      this.logger.error(`Stock reservation failed: ${apiResponse.message}`);
       this.stockQueueClient.emit(
         'stock.reservation.create.result',
         new EventData<CreateStockReservationResponseDto>({
@@ -42,7 +45,7 @@ export class StockService {
   async callReserveStock(
     createReservationStockDto: CreateStockReservationDto,
   ): Promise<CreateStockReservationResponseDto> {
-    console.log(
+    this.logger.debug(
       `Reserving stock for OrderId: ${createReservationStockDto.orderId}`,
     );
     // API delay
@@ -50,7 +53,7 @@ export class StockService {
 
     // Simulate 60% chance of success
     if (Math.random() < 0.6) {
-      // console.log('Stock reserved successfully');
+      this.logger.debug('Stock reserved successfully');
       return {
         success: true,
         orderId: createReservationStockDto.orderId,
@@ -58,7 +61,7 @@ export class StockService {
         message: 'Stock reserved successfully',
       };
     } else {
-      // console.log('Error reserving stock');
+      this.logger.error('Error reserving stock');
       return {
         success: false,
         orderId: createReservationStockDto.orderId,
@@ -76,7 +79,9 @@ export class StockService {
     );
 
     if (apiResponse.success) {
-      console.log(`Stock reservation confirmed: ${apiResponse.reservationId}`);
+      this.logger.debug(
+        `Stock reservation confirmed: ${apiResponse.reservationId}`,
+      );
       this.stockQueueClient.emit(
         'stock.reservation.confirm.result',
         new EventData<CreateStockReservationResponseDto>({
@@ -87,7 +92,9 @@ export class StockService {
         }),
       );
     } else {
-      console.error(`Stock reservation confirm error: ${apiResponse.message}`);
+      this.logger.error(
+        `Stock reservation confirm error: ${apiResponse.message}`,
+      );
       this.stockQueueClient.emit(
         'stock.reservation.confirm.result',
         new EventData<CreateStockReservationResponseDto>(
@@ -106,7 +113,7 @@ export class StockService {
   async callConfirmStockReservation(
     confirmReservationStockDto: ConfirmStockReservationDto,
   ): Promise<ConfirmStockReservationReponseDto> {
-    console.log(
+    this.logger.debug(
       `Confirm stock reservation for OrderId: ${confirmReservationStockDto.orderId}`,
     );
     // API delay
@@ -114,7 +121,7 @@ export class StockService {
 
     // Simulate chance of success
     if (Math.random() < 0.4) {
-      // console.log('Stock reservation confirmed successfully');
+      // this.logger.debug('Stock reservation confirmed successfully');
       return {
         success: true,
         orderId: confirmReservationStockDto.orderId,
@@ -122,7 +129,7 @@ export class StockService {
         message: 'Stock reservation confirmed successfully',
       };
     } else {
-      // console.log('Error reserving stock');
+      // this.logger.debug('Error reserving stock');
       return {
         success: false,
         orderId: confirmReservationStockDto.orderId,

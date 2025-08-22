@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy, RmqContext } from '@nestjs/microservices';
 import { InjectModel } from '@nestjs/mongoose';
 import { CreateOrderDto } from 'src/orders/dto/create-order.dto';
@@ -17,11 +17,13 @@ export class BackofficeService {
     @InjectModel(DeadLetter.name) private deadLetterModel: Model<DeadLetter>,
   ) {}
 
+  private readonly logger = new Logger(BackofficeService.name);
+
   async callCreateOrder(createOrderDto: CreateOrderDto) {
     await this.orderQueue
       .emit('orders.create', new EventData<CreateOrderDto>(createOrderDto))
       .toPromise();
-    // console.debug('Order creation request sent:', payload);
+    this.logger.debug('Order creation request sent');
     return { message: 'Order creation request sent' };
   }
 
@@ -50,6 +52,6 @@ export class BackofficeService {
         new EventData<CreateOrderReportDto>({ timestamp }),
       )
       .toPromise();
-    console.debug('Order report creation sent:', timestamp);
+    this.logger.debug('Order report creation sent:', timestamp);
   }
 }
