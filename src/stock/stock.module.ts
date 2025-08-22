@@ -1,30 +1,24 @@
 import { Module } from '@nestjs/common';
 import { StockService } from './stock.service';
 import { StockController } from './stock.controller';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientsModule } from '@nestjs/microservices';
+import { ConfigService } from '@nestjs/config';
+import { getRmqOptions } from 'src/config/rmq-client.config';
 
 @Module({
   imports: [
-    ClientsModule.register([
+    ClientsModule.registerAsync([
       {
         name: 'STOCK',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://guest:guest@localhost:5672'],
-          queue: 'stock',
-          exchange: 'orders',
-          exchangeType: 'topic',
-          wildcards: true,
-          persistent: true,
-          queueOptions: {
-            durable: true,
-            messageTtl: 5000,
-            arguments: {
-              'x-dead-letter-exchange': 'infra',
-              'x-dead-letter-routing-key': 'dlq',
-            },
-          },
-        },
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) =>
+          getRmqOptions('stock', configService),
+      },
+      {
+        name: 'DEBUG_DLQ',
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) =>
+          getRmqOptions('dlq', configService),
       },
     ]),
   ],

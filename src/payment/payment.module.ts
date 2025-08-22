@@ -1,30 +1,18 @@
 import { Module } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientsModule } from '@nestjs/microservices';
+import { ConfigService } from '@nestjs/config';
+import { getRmqOptions } from 'src/config/rmq-client.config';
 
 @Module({
   imports: [
-    ClientsModule.register([
+    ClientsModule.registerAsync([
       {
         name: 'PAYMENT',
-        transport: Transport.RMQ,
-        options: {
-          urls: ['amqp://guest:guest@localhost:5672'],
-          queue: 'payment',
-          exchange: 'orders',
-          exchangeType: 'topic',
-          wildcards: true,
-          persistent: true,
-          queueOptions: {
-            durable: true,
-            messageTtl: 5000,
-            arguments: {
-              'x-dead-letter-exchange': 'infra',
-              'x-dead-letter-routing-key': 'dlq',
-            },
-          },
-        },
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) =>
+          getRmqOptions('payment', configService),
       },
     ]),
   ],
