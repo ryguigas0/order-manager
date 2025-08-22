@@ -1,5 +1,5 @@
 import { ApiResult } from 'src/util/ApiResponse';
 
-export class CreateStockReservationResponseDto extends ApiResult {
+export class ConfirmStockReservationReponseDto extends ApiResult {
   reservationId?: number;
 }

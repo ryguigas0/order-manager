@@ -1,5 +1,5 @@
 import { ApiResult } from 'src/util/ApiResponse';
 
-export class CreatePaymentResponseDto extends ApiResult {
+export class ConfirmPaymentResponseDto extends ApiResult {
   paymentId?: number;
 }

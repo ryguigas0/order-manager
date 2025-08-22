@@ -12,4 +12,6 @@ export class Payment {
     enum: PaymenthMethod,
   })
   paymentMethod: string;
+  @Prop({})
+  paymentId?: number;
 }

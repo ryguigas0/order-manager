@@ -9,70 +9,10 @@ async function bootstrap() {
     transport: Transport.RMQ,
     options: {
       urls: ['amqp://guest:guest@localhost:5672'],
-      queue: 'orders',
       exchange: 'orders',
       exchangeType: 'topic',
       wildcards: true,
       persistent: true,
-      queueOptions: {
-        durable: true,
-        messageTtl: 5000,
-        arguments: {
-          'x-dead-letter-exchange': 'infra',
-          'x-dead-letter-routing-key': 'dlq',
-        },
-      },
-    },
-  });
-
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: ['amqp://guest:guest@localhost:5672'],
-      queue: 'stock',
-      exchange: 'orders',
-      exchangeType: 'topic',
-      wildcards: true,
-      persistent: true,
-      queueOptions: {
-        durable: true,
-        messageTtl: 5000,
-        arguments: {
-          'x-dead-letter-exchange': 'infra',
-          'x-dead-letter-routing-key': 'dlq',
-        },
-      },
-    },
-  });
-
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: ['amqp://guest:guest@localhost:5672'],
-      queue: 'payment',
-      exchange: 'orders',
-      exchangeType: 'topic',
-      wildcards: true,
-      persistent: true,
-      queueOptions: {
-        durable: true,
-        messageTtl: 5000,
-      },
-    },
-  });
-
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: ['amqp://guest:guest@localhost:5672'],
-      queue: 'dlq',
-      exchange: 'infra',
-      exchangeType: 'topic',
-      persistent: true,
-      queueOptions: {
-        durable: true,
-        messageTtl: 5000,
-      },
     },
   });
 

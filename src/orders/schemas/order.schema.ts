@@ -78,7 +78,10 @@ export class Order {
       'canceled',
     ],
   })
-  status: string;
+  status: OrderStatus;
+
+  @Prop({})
+  stockReservationId?: number;
 
   @Prop()
   statusHistory: StatusHistory[];

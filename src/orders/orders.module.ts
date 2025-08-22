@@ -73,6 +73,26 @@ import { Order, OrderSchema } from './schemas/order.schema';
           },
         },
       },
+      {
+        name: 'ORDER_API_RESULTS',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://guest:guest@localhost:5672'],
+          queue: '*.result',
+          exchange: 'orders',
+          exchangeType: 'topic',
+          wildcards: true,
+          persistent: true,
+          queueOptions: {
+            durable: true,
+            messageTtl: 5000,
+            arguments: {
+              'x-dead-letter-exchange': 'infra',
+              'x-dead-letter-routing-key': 'dlq',
+            },
+          },
+        },
+      },
     ]),
   ],
   controllers: [OrdersController],
