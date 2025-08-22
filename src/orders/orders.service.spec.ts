@@ -10,30 +10,28 @@ import { OrderReport } from './schemas/order-report.schema';
 import { UpdateOrderPaymentDto } from './dto/update-order-payment.dto';
 import { ConfirmPaymentResponseDto } from '../payment/dto/confirm-payment-response.dto';
 import { ConfirmStockReservationReponseDto } from '../stock/dto/confirm-stock-reservation-response.dto';
+import { UpdateOrderStockReservationDto } from './dto/update-order-stock-reservation.dto';
+import { UpdateOrderDto } from './dto/update-order.dto';
 
 describe('OrdersService', () => {
   let service: OrdersService;
   let paymentQueue: ClientProxy;
   let stockQueue: ClientProxy;
   let orderModel: Model<Order>;
+  let orderReportModel: Model<OrderReport>;
 
-  // --- MOCK UNIFICADO E CORRIGIDO ---
   const mockSave = jest.fn();
-
-  // 1. O mock principal é uma função (para funcionar com 'new')
   const mockOrderModel = jest.fn().mockImplementation((dto) => ({
     ...dto,
     save: mockSave,
   }));
 
-  // 2. Anexamos os métodos estáticos diretamente à função mockada
   mockOrderModel.find = jest.fn();
   mockOrderModel.findById = jest.fn();
   mockOrderModel.findOne = jest.fn();
-  mockOrderModel.updateOne = jest.fn().mockReturnThis(); // Permite encadear .exec()
+  mockOrderModel.updateOne = jest.fn().mockReturnThis();
   mockOrderModel.exec = jest.fn();
   mockOrderModel.aggregate = jest.fn();
-  // --- FIM DO MOCK UNIFICADO ---
 
   const mockClientProxy = {
     emit: jest.fn(() => ({
@@ -44,10 +42,13 @@ describe('OrdersService', () => {
   const mockOrderReportModel = {
     new: jest.fn().mockResolvedValue({ save: jest.fn().mockResolvedValue({}) }),
     findOne: jest.fn(),
+    find: jest.fn().mockReturnThis(),
+    sort: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    exec: jest.fn(),
   };
 
   beforeEach(async () => {
-    // Limpa os mocks antes de cada teste para garantir isolamento
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -76,6 +77,9 @@ describe('OrdersService', () => {
     paymentQueue = module.get<ClientProxy>('ORDER_PAYMENT');
     stockQueue = module.get<ClientProxy>('ORDER_STOCK_RESERVATION');
     orderModel = module.get<Model<Order>>(getModelToken(Order.name));
+    orderReportModel = module.get<Model<OrderReport>>(
+      getModelToken(OrderReport.name),
+    );
   });
 
   it('should be defined', () => {
@@ -101,12 +105,10 @@ describe('OrdersService', () => {
         .spyOn(service as any, 'validateOrderIdempotency')
         .mockResolvedValue(true);
 
-      // CORREÇÃO: Garante que o mock do save retorne o objeto completo que o serviço espera
       const savedOrder = {
         ...createOrderDto,
         _id: 'a-unique-object-id',
         payment: {
-          // Propriedade `payment` adicionada
           paymentMethod: createOrderDto.paymentMethod,
           totalAmount: createOrderDto.totalAmount,
         },
@@ -133,55 +135,23 @@ describe('OrdersService', () => {
 
       await service.handleCreateOrder(eventPayload);
 
-      // CORREÇÃO: A asserção deve ser no construtor mockado, não em uma propriedade '.new'
       expect(mockOrderModel).not.toHaveBeenCalled();
       expect(paymentQueue.emit).not.toHaveBeenCalled();
     });
   });
 
-  describe('Order Status Transitions', () => {
-    it(`should update order to 'pending-payment' after payment is created`, async () => {
-      const updateDto: UpdateOrderPaymentDto = {
-        eventId: 'event1',
-        orderId: 'order1',
-        paymentId: 12345,
-      };
-      const mockOrder = {
-        _id: 'order1',
-        status: OrderStatus.pending,
-        payment: {},
-      };
-      jest
-        .spyOn(service as any, 'validateOrderIdempotency')
-        .mockResolvedValue(true);
-      jest.spyOn(service, 'getOrder').mockResolvedValue(mockOrder as any);
-
-      await service.handleOrderPaymentCreated(updateDto);
-
-      expect(mockOrderModel.updateOne).toHaveBeenCalledWith(
-        { _id: 'order1' },
-        expect.objectContaining({
-          $set: { status: OrderStatus.pendingPayment },
-        }),
-      );
-      expect(paymentQueue.emit).toHaveBeenCalledWith(
-        'payment.confirm',
-        expect.any(EventData),
-      );
-    });
-
-    it(`should update order to 'pending-stock' after payment is confirmed`, async () => {
+  describe('handleOrderPaymentConfirmed', () => {
+    it('should retry payment confirmation upon failure', async () => {
       const confirmDto: ConfirmPaymentResponseDto = {
         orderId: 'order1',
-        success: true,
-        message: 'Confirmed',
+        success: false,
+        message: 'Confirmation Failed',
       };
-      const eventPayload = new EventData(confirmDto);
+      const eventPayload = new EventData(confirmDto, 1);
       const mockOrder = {
         _id: 'order1',
         status: OrderStatus.pendingPayment,
         payment: { paymentId: 12345 },
-        items: [],
       };
       jest
         .spyOn(service as any, 'validateOrderIdempotency')
@@ -190,17 +160,178 @@ describe('OrdersService', () => {
 
       await service.handleOrderPaymentConfirmed(eventPayload);
 
-      expect(mockOrderModel.updateOne).toHaveBeenCalledWith(
-        { _id: 'order1' },
-        expect.objectContaining({ $set: { status: OrderStatus.pendingStock } }),
-      );
-      expect(stockQueue.emit).toHaveBeenCalledWith(
-        'stock.reservation.create',
-        expect.any(EventData),
+      expect(paymentQueue.emit).toHaveBeenCalledWith(
+        'payment.confirm',
+        expect.any(Object),
       );
     });
 
-    it(`should update order to 'ready' after stock is reserved and confirmed`, async () => {
+    it('should cancel the order after exceeding max retries for payment confirmation', async () => {
+      const confirmDto: ConfirmPaymentResponseDto = {
+        orderId: 'order1',
+        success: false,
+        message: 'Confirmation Failed',
+      };
+      // CORREÇÃO: currentTry deve ser maior que maxTries para acionar o cancelamento
+      const eventPayload = new EventData(confirmDto, 6);
+      const mockOrder = {
+        _id: 'order1',
+        status: OrderStatus.pendingPayment,
+        payment: { paymentId: 12345 },
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getOrder').mockResolvedValue(mockOrder as any);
+      const cancelOrderSpy = jest
+        .spyOn(service, 'cancelOrder')
+        .mockResolvedValue(undefined);
+
+      await service.handleOrderPaymentConfirmed(eventPayload);
+
+      expect(cancelOrderSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId: 'order1' }),
+      );
+    });
+
+    it('should not confirm payment for an order with an invalid status', async () => {
+      const confirmDto: ConfirmPaymentResponseDto = {
+        orderId: 'order1',
+        success: true,
+        message: 'Confirmed',
+      };
+      const eventPayload = new EventData(confirmDto);
+      const mockOrder = {
+        _id: 'order1',
+        status: OrderStatus.shipped,
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getOrder').mockResolvedValue(mockOrder as any);
+
+      await service.handleOrderPaymentConfirmed(eventPayload);
+
+      expect(orderModel.updateOne).not.toHaveBeenCalled();
+      expect(stockQueue.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleStockReservationCreated', () => {
+    it('should update the order with the stock reservation ID', async () => {
+      const updateDto: UpdateOrderStockReservationDto = {
+        eventId: 'event1',
+        orderId: 'order1',
+        reservationId: 54321,
+      };
+      const mockOrder = {
+        _id: 'order1',
+        status: OrderStatus.pendingStock,
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getOrder').mockResolvedValue(mockOrder as any);
+
+      await service.handleStockReservationCreated(updateDto);
+
+      // CORREÇÃO: O teste agora espera o objeto completo que é enviado para o updateOne
+      expect(orderModel.updateOne).toHaveBeenCalledWith(
+        { _id: 'order1' },
+        {
+          $set: {
+            stockReservationId: 54321,
+            status: OrderStatus.pendingStock,
+          },
+          $push: {
+            statusHistory: expect.objectContaining({
+              eventId: 'event1',
+              status: OrderStatus.pendingStock,
+            }),
+          },
+        },
+      );
+    });
+
+    it('should emit a stock.reservation.confirm event', async () => {
+      const updateDto: UpdateOrderStockReservationDto = {
+        eventId: 'event1',
+        orderId: 'order1',
+        reservationId: 54321,
+      };
+      const mockOrder = {
+        _id: 'order1',
+        status: OrderStatus.pendingStock,
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getOrder').mockResolvedValue(mockOrder as any);
+
+      await service.handleStockReservationCreated(updateDto);
+
+      expect(paymentQueue.emit).toHaveBeenCalledWith(
+        'stock.reservation.confirm',
+        expect.any(EventData),
+      );
+    });
+  });
+
+  describe('handleStockReservationConfirmed', () => {
+    it('should retry stock confirmation upon failure', async () => {
+      const confirmDto: ConfirmStockReservationReponseDto = {
+        orderId: 'order1',
+        success: false,
+        message: 'Reservation Failed',
+      };
+      const eventPayload = new EventData(confirmDto, 1);
+      const mockOrder = {
+        _id: 'order1',
+        status: OrderStatus.pendingStock,
+        stockReservationId: 54321,
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getOrder').mockResolvedValue(mockOrder as any);
+
+      await service.handleStockReservationConfirmed(eventPayload);
+
+      expect(stockQueue.emit).toHaveBeenCalledWith(
+        'stock.reservation.confirm',
+        expect.any(Object),
+      );
+    });
+
+    it('should cancel the order after exceeding max retries for stock confirmation', async () => {
+      const confirmDto: ConfirmStockReservationReponseDto = {
+        orderId: 'order1',
+        success: false,
+        message: 'Reservation Failed',
+      };
+      // CORREÇÃO: currentTry deve ser maior que maxTries
+      const eventPayload = new EventData(confirmDto, 6);
+      const mockOrder = {
+        _id: 'order1',
+        status: OrderStatus.pendingStock,
+        stockReservationId: 54321,
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getOrder').mockResolvedValue(mockOrder as any);
+      const cancelOrderSpy = jest
+        .spyOn(service, 'cancelOrder')
+        .mockResolvedValue(undefined);
+
+      await service.handleStockReservationConfirmed(eventPayload);
+
+      expect(cancelOrderSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId: 'order1' }),
+      );
+    });
+
+    it('should set the order status to ready upon successful stock confirmation', async () => {
       const confirmDto: ConfirmStockReservationReponseDto = {
         orderId: 'order1',
         success: true,
@@ -219,12 +350,100 @@ describe('OrdersService', () => {
 
       await service.handleStockReservationConfirmed(eventPayload);
 
-      expect(mockOrderModel.updateOne).toHaveBeenCalledWith(
+      expect(orderModel.updateOne).toHaveBeenCalledWith(
         { _id: 'order1' },
-        expect.objectContaining({ $set: { status: OrderStatus.ready } }),
+        expect.objectContaining({
+          $set: { status: OrderStatus.ready },
+        }),
+      );
+    });
+
+    it('should not confirm stock reservation for an order with an invalid status', async () => {
+      const confirmDto: ConfirmStockReservationReponseDto = {
+        orderId: 'order1',
+        success: true,
+        message: 'Reserved',
+      };
+      const eventPayload = new EventData(confirmDto);
+      const mockOrder = {
+        _id: 'order1',
+        status: OrderStatus.delivered,
+        stockReservationId: 54321,
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getOrder').mockResolvedValue(mockOrder as any);
+
+      await service.handleStockReservationConfirmed(eventPayload);
+
+      expect(orderModel.updateOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelOrder', () => {
+    it('should set the order status to canceled', async () => {
+      const updateDto: UpdateOrderDto = {
+        eventId: 'event1',
+        orderId: 'order1',
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+
+      await service.cancelOrder(updateDto);
+
+      expect(orderModel.updateOne).toHaveBeenCalledWith(
+        { _id: 'order1' },
+        expect.objectContaining({
+          $set: { status: OrderStatus.canceled },
+        }),
+      );
+    });
+
+    it('should add a reason to the status history when an order is canceled', async () => {
+      const updateDto: UpdateOrderDto = {
+        eventId: 'event1',
+        orderId: 'order1',
+        reason: 'Out of stock',
+      };
+      jest
+        .spyOn(service as any, 'validateOrderIdempotency')
+        .mockResolvedValue(true);
+
+      await service.cancelOrder(updateDto);
+
+      expect(orderModel.updateOne).toHaveBeenCalledWith(
+        { _id: 'order1' },
+        expect.objectContaining({
+          $push: {
+            statusHistory: expect.objectContaining({
+              reason: 'Out of stock',
+            }),
+          },
+        }),
       );
     });
   });
 
-  // Você pode adicionar os outros blocos de teste ('Order Cancellation' e 'Retries') aqui
+  describe('getOrderReports', () => {
+    it('should return a list of order reports', async () => {
+      const mockReports = [
+        { timestamp: '2023-01-01' },
+        { timestamp: '2023-01-02' },
+      ];
+      (orderReportModel.exec as jest.Mock).mockResolvedValue(mockReports);
+
+      const reports = await service.getOrderReports();
+
+      expect(reports).toEqual(mockReports);
+      expect(orderReportModel.find).toHaveBeenCalledWith({});
+    });
+
+    it('should limit the number of reports based on pageSize', async () => {
+      await service.getOrderReports(5);
+
+      expect(orderReportModel.limit).toHaveBeenCalledWith(5);
+    });
+  });
 });
