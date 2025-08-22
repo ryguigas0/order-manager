@@ -13,6 +13,7 @@ import { UpdateOrderPaymentDto } from './dto/update-order-payment.dto';
 import { ConfirmStockReservationDto } from 'src/stock/dto/confirm-stock-reservation.dto';
 import { UpdateOrderStockReservationDto } from './dto/update-order-stock-reservation.dto';
 import { ConfirmPaymentResponseDto } from 'src/payment/dto/confirm-payment-response.dto';
+import { ConfirmStockReservationReponseDto } from 'src/stock/dto/confirm-stock-reservation-response.dto';
 
 @Injectable()
 export class OrdersService {
@@ -281,36 +282,76 @@ export class OrdersService {
   }
 
   async handleStockReservationConfirmed(
-    updateOrderStockReservation: UpdateOrderStockReservationDto,
+    event: EventData<ConfirmStockReservationReponseDto>,
   ) {
-    const shouldProcess = await this.validateIdempotency(
-      updateOrderStockReservation.eventId,
-    );
+    const { eventId, currentTry, data } = event;
+    const { orderId, message } = data;
+
+    const shouldProcess = await this.validateIdempotency(eventId);
     if (!shouldProcess) {
       return;
     }
 
-    const order = await this.getOrder(updateOrderStockReservation.orderId);
+    const order = await this.getOrder(orderId);
 
     if (!order) {
-      throw new Error('Order not found for confirming stock reservation');
+      console.log('Order not found for confirming stock reservation');
+      return;
     }
 
     if (order.status !== OrderStatus.pendingStock) {
       console.log(
-        `Order ${updateOrderStockReservation.orderId} is not in a valid state for confirming stock reservation`,
+        `Order ${orderId} is not in a valid state for confirming stock reservation`,
       );
       return;
     }
 
-    console.log(
-      `Confirming stock reservation for order ${updateOrderStockReservation.orderId}`,
-    );
+    if (!order.stockReservationId) {
+      console.log(`Order ${orderId} without stock reservation`);
+      return;
+    }
+
+    if (!data.success) {
+      if (event.currentTry <= event.backoff.maxTries) {
+        console.log(
+          'Retry',
+          currentTry + 1,
+          'confirm stock reservation',
+          orderId,
+        );
+
+        const retryEvent = new EventData<ConfirmStockReservationDto>(
+          {
+            orderId: order._id.toString(),
+            reservationId: order.stockReservationId,
+          },
+          currentTry + 1,
+          { ...event.backoff },
+        );
+
+        await this.emitMessage(
+          this.stockQueue,
+          'stock.reservation.confirm',
+          retryEvent,
+          retryEvent.backoff.delay + Math.pow(5, retryEvent.currentTry) * 1000,
+        );
+      } else {
+        console.log('Canceling order', orderId);
+        await this.cancelOrder({
+          eventId: eventId,
+          orderId: orderId,
+          reason: message,
+        });
+      }
+      return;
+    }
+
+    console.log(`Confirming stock reservation for order ${orderId}`);
 
     await this.orderModel
       .updateOne(
         {
-          _id: updateOrderStockReservation.orderId,
+          _id: orderId,
         },
         {
           $set: {
@@ -318,10 +359,10 @@ export class OrdersService {
           },
           $push: {
             statusHistory: {
-              eventId: updateOrderStockReservation.eventId,
+              eventId: eventId,
               status: OrderStatus.ready,
               timestamp: new Date().toISOString(),
-              reason: updateOrderStockReservation.reason,
+              reason: message,
             },
           },
         },

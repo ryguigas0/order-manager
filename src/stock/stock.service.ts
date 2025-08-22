@@ -110,10 +110,10 @@ export class StockService {
       `Confirm stock reservation for OrderId: ${confirmReservationStockDto.orderId}`,
     );
     // API delay
-    await new Promise((resolve) => setTimeout(resolve, Math.random() * 10000));
+    await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
 
-    // Simulate 60% chance of success
-    if (Math.random() < 0.6) {
+    // Simulate chance of success
+    if (Math.random() < 0.4) {
       // console.log('Stock reservation confirmed successfully');
       return {
         success: true,

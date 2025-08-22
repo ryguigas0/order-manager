@@ -112,7 +112,7 @@ export class PaymentService {
     await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
 
     // Simulate chance of success
-    if (Math.random() < 0.01) {
+    if (Math.random() < 0.4) {
       // console.log('Payment created successfully');
       return {
         orderId: confirmPaymentDto.orderId,
