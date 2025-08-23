@@ -4,8 +4,8 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    // logger: ['debug', 'error', 'warn'],
-    logger: ['error', 'warn'],
+    logger: ['debug', 'error', 'warn'],
+    // logger: ['error', 'warn'],
   });
 
   app.connectMicroservice<MicroserviceOptions>({

@@ -22,8 +22,8 @@ export class EventData<T> {
 
     if (!backoff) {
       this.backoff = {
-        delay: 1000,
-        maxTries: 5,
+        delay: Number.parseInt(process.env.DEFAULT_RETRY_DELAY_MS || '1000'),
+        maxTries: Number.parseInt(process.env.DEFAULT_RETRY_MAX_TRIES || '5'),
       };
     } else {
       this.backoff = backoff;
