@@ -6,10 +6,10 @@ services:
     ports:
       - '${PORT}:${PORT}'
     env_file:
-      - .env.example
+      - .env
     depends_on:
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
       mongo:
         condition: service_healthy
 
@@ -21,10 +21,17 @@ services:
       - '${RMQ_PORT}:${RMQ_PORT}'
       - '15672:15672'
     env_file:
-      - .env.example
+      - .env
     environment:
       RABBITMQ_DEFAULT_USER: ${RMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RMQ_PASS}
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'check_port_connectivity']
+      interval: 10s
+      timeout: 5s
+      retries: 2
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
 
   mongo:
     build:
@@ -33,7 +40,7 @@ services:
     ports:
       - '${MONGO_PORT}:${MONGO_PORT}'
     env_file:
-      - .env.example
+      - .env
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
@@ -43,7 +50,8 @@ services:
       test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 2
 
 volumes:
   mongo-data:
+  rabbitmq-data:
