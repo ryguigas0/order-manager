@@ -442,13 +442,9 @@ export class OrdersService {
       timestamp,
     };
 
-    console.log({ newModel });
-
     const newReport = new this.orderReportModel(newModel);
 
-    const savedReport = await newReport.save();
-
-    console.log({ savedReport });
+    await newReport.save();
 
     this.logger.debug('Created report ', timestamp);
   }
